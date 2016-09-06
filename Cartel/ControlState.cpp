@@ -15,9 +15,14 @@
  */
 
 #include "ControlState.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <cmath>
+#include <algorithm>
+
+#include <imgui.h>
+#include <imgui_impl_glfw_gl3.h>
 
 ControlState c_state = ControlState();
 
@@ -30,10 +35,10 @@ int ControlState::init(WorldState &w)
 {
     this->w = &w;
 
-    width  = 640;
-    height = 480;
+    width  = 800;
+    height = 600;
     /* As of right now we only have one window */
-    window = glfwCreateWindow(width, height, "Window", NULL, NULL);
+    window = glfwCreateWindow(width, height, "Cartel", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -44,6 +49,7 @@ int ControlState::init(WorldState &w)
 
     // bind all callbacks
     glfwSetKeyCallback(window, key_callback);
+	glfwSetCharCallback(window, char_callback);
     glfwSetFramebufferSizeCallback(window, reshape_callback);
     glfwSetCursorPosCallback(window, mousePos_callback);
     glfwSetCursorEnterCallback(window, mouseEnter_callback);
@@ -63,11 +69,12 @@ int ControlState::deltaArrUD()
     return arrD - arrU;
 }
 
-void ControlState::updateView(float dTheta, float dPhi, float dDepth)
+void ControlState::clearViewDeltas()
 {
-    viewTheta = fmod(viewTheta + 360 + float(dTheta), 360);
-    viewPhi   = std::min(90.0f, std::max(-90.0f, viewPhi + dPhi));
-    viewDepth += dDepth;
+    viewTheta = 0;
+    viewPhi   = 0;
+    viewDepth = 0;
+    viewPan   = glm::vec3(0, 0, 0);
 }
 
 void printHelp()
@@ -79,8 +86,9 @@ void printHelp()
            "q, esc - exit\n"
            "h - help (you have already figured this out)\n\n"
            "___View___\n"
-           "left click and drag - adjusts view\n"
-           "scroll wheel        - zoom\n");
+           "left click and drag      - adjusts view\n"
+           "shft+left click and drag - pans the view\n"
+           "scroll wheel             - zoom\n");
 }
 
 /*****************************************************************************
@@ -104,22 +112,23 @@ void reshape_callback(GLFWwindow* window, int w, int h)
 /*****************************************************************************
  * Active Callback functions
  *****************************************************************************/
+void char_callback(GLFWwindow* window, unsigned int c) {
+	if (ImGui::GetIO().WantTextInput) {
+		ImGui_ImplGlfwGL3_CharCallback(window, c);
+		return;
+	}
+}
+
 // callback when a key is pressed
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
-    /* key code goes here */
+    if (ImGui::GetIO().WantTextInput) {
+		ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mode);
+		return;
+	}
 
     switch(key)
     {
-    case GLFW_KEY_ESCAPE:
-        glfwSetWindowShouldClose(window, GL_TRUE);
-        break;
-    case GLFW_KEY_Q:
-        glfwSetWindowShouldClose(window, GL_TRUE);
-        break;
-    case GLFW_KEY_H:
-        printHelp();
-        break;
     case GLFW_KEY_LEFT:
         c_state.arrL = (action == GLFW_RELEASE) ? 0 : 1;
         break;
@@ -132,51 +141,70 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     case GLFW_KEY_DOWN:
         c_state.arrD = (action == GLFW_RELEASE) ? 0 : 1;
         break;
+
+    case GLFW_KEY_ESCAPE: // see also Q
+	case GLFW_KEY_Q:
+        glfwSetWindowShouldClose(window, GL_TRUE);
+        break;
+
+    case GLFW_KEY_LEFT_SHIFT:
+    case GLFW_KEY_RIGHT_SHIFT:
+        c_state.modShft = (action == GLFW_RELEASE) ? 0 : 1;
+        break;
+	
+    case GLFW_KEY_H:
+        printHelp();
+        break;
     case GLFW_KEY_L:
-        c_state.reload = (action == GLFW_RELEASE) ? c_state.reload : 1;
+		if (action == GLFW_RELEASE) c_state.op = EDIT_LOAD_NEXT;
         break;
     case GLFW_KEY_M:
         if (action == GLFW_RELEASE)
             c_state.mode = (RENDER_MODE)((c_state.mode + 1) % MODE_MAX);
         break;
+
     case GLFW_KEY_N:
-        if (action == GLFW_RELEASE) {
-            int tmp = (c_state.view_mode + 1);
-            c_state.view_mode = (tmp > VIEW_ALL || tmp < VIEW_FACES) ? VIEW_FACES : tmp;
-        }
+        if (action == GLFW_RELEASE) c_state.view_mode = c_state.view_mode + 1 > VIEW_ALL ? VIEW_FACES : c_state.view_mode + 1;
         break;
+	case GLFW_KEY_F:
+		if (action == GLFW_RELEASE) c_state.view_mode ^= VIEW_FACES;
+		break;
+	case GLFW_KEY_E:
+		if (action == GLFW_RELEASE) c_state.view_mode ^= VIEW_EDGES;
+		break;
+	case GLFW_KEY_V:
+		if (action == GLFW_RELEASE) c_state.view_mode ^= VIEW_VERTS;
+		break;
+	case GLFW_KEY_A:
+		if (action == GLFW_RELEASE) c_state.view_axis = !c_state.view_axis;
+		break;
+
+	case GLFW_KEY_C:
+		if (action == GLFW_RELEASE) c_state.op = EDIT_CLEAR_SELECTION;
+		break;
 	case GLFW_KEY_D:
 		if( action == GLFW_RELEASE )
 			c_state.op = EDIT_DEBUG;
 		break;
+
     case GLFW_KEY_0:
-        if (action == GLFW_RELEASE)
-            c_state.op = EDIT_SQRT3_SUBDIV;
+		if (action == GLFW_RELEASE) { c_state.op = EDIT_SQRT3_SUBDIV; }
         break;
-    case GLFW_KEY_9:
-        if (action == GLFW_RELEASE)
-            c_state.op = EDIT_RELOCATE_VERTS;
-        break;
-	case GLFW_KEY_8:
-        if (action == GLFW_RELEASE)
-            c_state.op = (mode & GLFW_MOD_SHIFT) ? EDIT_COLLAPSE_FAST_EDIT : EDIT_COLLAPSE_EDIT;
-        break;
-    case GLFW_KEY_7:
-        if (action == GLFW_RELEASE)
-            c_state.op = EDIT_AREA_RELOCATION;
-        break;
-    case GLFW_KEY_6:
-        if (action == GLFW_RELEASE)
-            c_state.op = EDIT_DELAUNAY;
-        break;
-    case GLFW_KEY_5:
-        if (action == GLFW_RELEASE)
-            c_state.op = EDIT_REMESH;
-        break;
-    case GLFW_KEY_4:
-        if (action == GLFW_RELEASE)
-            c_state.op = EDIT_PRETTY;
-        break;
+	case GLFW_KEY_1:
+		if (action == GLFW_RELEASE) {}
+		break;
+	case GLFW_KEY_2:
+		if (action == GLFW_RELEASE) {}
+		break;
+	case GLFW_KEY_3:
+		if (action == GLFW_RELEASE) {}
+		break;
+	case GLFW_KEY_4:
+		if (action == GLFW_RELEASE) {}
+		break;
+	case GLFW_KEY_5:
+		if (action == GLFW_RELEASE) {}
+		break;
     }
     
 }
@@ -184,62 +212,89 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 // callback when a mouse button is pressed
 static void mouseBtn_callback(GLFWwindow* win, int button, int action, int mod)
 {
+	if (ImGui::GetIO().WantCaptureMouse) return;
+
     /* TODO: any controls relative to pressing the mouse buttons goes here */
 
     if (button == GLFW_MOUSE_BUTTON_LEFT)
+    {
         c_state.mouseBtnL = (action == GLFW_PRESS) ? 1 : 0;
+            
+    }
     else if (button == GLFW_MOUSE_BUTTON_RIGHT)
-        c_state.mouseBtnR = (action == GLFW_PRESS) ? 1 : 0;
+	{
+        if (action == GLFW_PRESS) {
+            c_state.mouseBtnR = true;
+            c_state.select_active = true;
+        }
+        else {
+            c_state.mouseBtnR = false;
+            c_state.select_active = false;
+            c_state.select_dirty = true;
+        }
+	}
     else if (button == GLFW_MOUSE_BUTTON_MIDDLE)
         c_state.mouseBtnC = (action == GLFW_PRESS) ? 1 : 0;
 
     if (action == GLFW_PRESS)
         c_state.mouseEvent = true;
-    else
-    {
-        c_state.select_start = glm::vec3(0, 0, 0);
-        c_state.select_curr = glm::vec3(0, 0, 0);
-    }
 }
 
 // callback when the mouse is moved. This will be called
 // ALOT keep it as light as possible!!
 static void mousePos_callback(GLFWwindow* win, double x, double y)
 {
+	if (ImGui::GetIO().WantCaptureMouse) return;
+
+	float fx = static_cast<float>(x);
+	float fy = static_cast<float>(y);
+
     // screen Y coords are inverted.
-    y = c_state.height - y;
+    fy = c_state.height - fy;
 
     // currently used to update camera angles if mouse pressed
     if (c_state.mouseBtnL)
     {
         // Calculate change from last known mouse positon.
-        int dx = x - c_state.mouseX;
-        int dy = y - c_state.mouseY;
+        float dx = fx - c_state.mouseX;
+        float dy = fy - c_state.mouseY;
     
-        // Update viewing angles.
-        c_state.viewTheta = int(c_state.viewTheta + 360 + float(dx) / 2) % 360;
-        c_state.viewPhi   = std::min(90.0f, std::max(-90.0f, c_state.viewPhi - dy));
+        if (c_state.modShft) // update screen pan
+        {
+            float perc = 50 / c_state.viewDepth;
+            c_state.viewPan = c_state.viewPan + glm::vec3(dx / perc, dy / perc, 0);
+        }
+        else // Update viewing angles.
+        {
+            c_state.viewTheta = fmod(c_state.viewTheta + 360.0f + dx / 2.0f, 360.0f);
+            c_state.viewPhi   = std::min(90.0f, std::max(-90.0f, c_state.viewPhi - dy));
+        }
     }
 
-    c_state.mouseX = x;
-    c_state.mouseY = y;
+    c_state.mouseX = fx;
+    c_state.mouseY = fy;
 
-    if (c_state.mouseBtnL && c_state.mouseEvent)
+    if (c_state.mouseBtnR && c_state.mouseEvent)
     {
-        c_state.select_start = glm::vec3(x, y, 0);
-        c_state.select_curr = c_state.select_start;
+        c_state.select_start = glm::vec3(fx, fy, 0);
+        c_state.select_end = c_state.select_start;
         c_state.mouseEvent = false;
     }
-    else if (c_state.mouseBtnL)
-        c_state.select_curr = glm::vec3(x, y, 0);
+    else if (c_state.mouseBtnR)
+        c_state.select_end = glm::vec3(fx, fy, 0);
 }
 
 static void mouseScroll_callback(GLFWwindow* win, double x_offset, double y_offset)
 {
-    c_state.mouseScroll = y_offset/20;
+	if (ImGui::GetIO().WantCaptureMouse) return;
+
+    // since we would read from mouseScroll, set viewDepth
+    // and then clear mouseScroll, I shall refrain from even
+    // setting it for this usage
+    c_state.viewDepth -= static_cast<float>(y_offset) / 30;
 }
 
 static void mouseEnter_callback(GLFWwindow* win, int entered)
 {
-    c_state.mouseInWindow = entered;
+    c_state.mouseInWindow = entered > 0;
 }

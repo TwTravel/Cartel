@@ -20,27 +20,12 @@
 #ifndef VBUFFER_H
 #define VBUFFER_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #define MAX_NUM_ATTRIB 4
 
-struct attrib_info
-{
-    unsigned int attrib_number;  // which attribute within the mesh this info is for
-    unsigned int attrib_size;    // total size in bytes of one attribute
-    unsigned int num_comp;       // the number of components each of these atributes holds
-    unsigned int data_offset;    // the number of bytes from the start of the array to the first instance of this attribute
-    unsigned int data_stride;    // the number of bytes between instances of this attribute
-};
+#include "RenderState.h"
 
 /**
  * CPU side storage of the data to be stored in one VBO on the GPU. This object can handle
@@ -53,12 +38,21 @@ public:
     // animations would ech require a different id (or deleting one would
     // inherently delete the gl id its working with)
 
-    VBuffer():m_renderID(0), m_renderSize(NULL), m_local_data(NULL),
+    VBuffer():m_renderID(0), m_rState(NULL), m_local_data(NULL),
               m_attr_info(NULL), m_num_attr(0), m_size(0)
     {}
-    VBuffer(GLuint rID, GLuint *rSize):m_renderID(rID), m_renderSize(rSize), m_local_data(NULL),
+    VBuffer(GLuint bufferID, RenderState &r_state):m_renderID(bufferID), m_rState(&r_state), m_local_data(NULL),
                                        m_attr_info(NULL), m_num_attr(0), m_size(0)
     {}
+    VBuffer(const VBuffer &old): m_renderID(old.m_renderID), m_rState(old.m_rState), m_num_attr(old.m_num_attr),
+                           m_size(old.m_size) {
+        m_local_data = (float*) new char[m_size];
+        memcpy(m_local_data, old.m_local_data, m_size);
+
+        m_attr_info = new attrib_info[m_num_attr];
+        memcpy(m_attr_info, old.m_attr_info, sizeof(attrib_info)*m_num_attr);
+    }
+
     ~VBuffer()
     {
         if (m_local_data)
@@ -67,10 +61,10 @@ public:
             delete [] m_attr_info;
     }
 
-    void setRender(GLuint buffID, GLuint *size_ptr)
+    void setRender(GLuint buffID, RenderState &r_state)
     {
         m_renderID = buffID;
-        m_renderSize = size_ptr;
+        m_rState = &r_state;
     }
 
     void resizeBuffer(int size);
@@ -79,11 +73,8 @@ public:
     // VAO is currently bound
     void loadBuffer(int data_size, GLubyte *data, int data_offset, int num_attr, attrib_info *attr_info);
     void SyncBuffer();
-    void SyncBuffer(GLuint size);
+    void SyncBuffer(GLuint buffer);
     void SyncBuffer(GLuint buffer, GLuint *size);
-
-    // WARNING: this may be very very slow depending on how vertex attributes are packed
-    void analyzeAttr(int attrib_num, float *&attrib_ptr, int &stride);
 
     int          m_size;           // the size in BYTEs of our local data store
     int          m_num_attr;       // the number of attributes per vertex
@@ -91,10 +82,8 @@ public:
 
     float       *m_local_data;     // our local copy of the mesh data that we can modify and copy to the gpu
 
-    // default render values, if m_renderSize is NULL then the memory on the GPU
-    // will be reallocated on any Sync call that does not specify a size
-    GLuint  m_renderID;
-    GLuint *m_renderSize; // size of the buffer on the GPU (points to render state)
+    GLuint       m_renderID;
+    RenderState *m_rState;
 };
 
 #endif // VBUFFER_H

@@ -59,32 +59,14 @@ void IBuffer::loadBuffer(int num_elem, int elem_size, int *data, int data_offset
 }
 
 // copy all local data to the GPU
-void IBuffer::SyncBuffer(GLuint bufferID, GLuint *size)
+// \param specify a buffer other than the stored buffer to allocate to
+void IBuffer::SyncBuffer(GLuint buffer)
 {
-    if (!m_local_data)
-    {
-        fprintf(stderr, "No Index bound\n");
-        return;
-    }
-    // bind the GPU buffer that we want to setup for use with our local data
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
-    
-    if (m_size > *size)
-    {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_size, m_local_data, GL_DYNAMIC_DRAW);
-        *size = m_size;
-    }
-    else
-        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, m_size, m_local_data);
+    m_rState->bindIBO(buffer);
+    m_rState->setBufferData(buffer, m_size, (unsigned char *)m_local_data);
 }
 
-// copy all local data to the GPU
+// copy all local data to the GPU using
+// stored buffer ID
 void IBuffer::SyncBuffer()
-{
-    if (m_renderID == 0)
-    {
-        fprintf(stderr, "Default Render Information not Populated, aborting\n");
-        return;
-    }
-    SyncBuffer(m_renderID, (m_renderSize == NULL) ? 0 : m_renderSize);
-}
+{ SyncBuffer(m_renderID); }

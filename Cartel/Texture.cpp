@@ -90,11 +90,11 @@ void Texture::setDefaultSampleState(GLenum wrap, GLenum filt)
      * This is overridden if this texture is bound to a sampler
      ***********************************************************/
     // define textures to not repeat
-    glTexParameterf( m_target, GL_TEXTURE_WRAP_S, wrap);
-    glTexParameterf( m_target, GL_TEXTURE_WRAP_T, wrap);
-    glTexParameterf( m_target, GL_TEXTURE_WRAP_R, wrap);
+    glTexParameteri( m_target, GL_TEXTURE_WRAP_S, wrap);
+    glTexParameteri( m_target, GL_TEXTURE_WRAP_T, wrap);
+    glTexParameteri( m_target, GL_TEXTURE_WRAP_R, wrap);
     // these are not technically needed, but will allow us to leverage hardware for
     // extra blurring by sampling between pixels (and using the linear interpolation)
-    glTexParameterf( m_target, GL_TEXTURE_MIN_FILTER, filt);
-    glTexParameterf( m_target, GL_TEXTURE_MAG_FILTER, filt);
+    glTexParameteri( m_target, GL_TEXTURE_MIN_FILTER, filt);
+    glTexParameteri( m_target, GL_TEXTURE_MAG_FILTER, filt);
 }

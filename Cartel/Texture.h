@@ -18,17 +18,9 @@
 #ifndef TEXTURE_H
 #define TEXTURE_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
-# include <glm/glm.hpp>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 struct texture_info
 {
@@ -68,7 +60,7 @@ public:
     {
         glGenTextures(1, &m_texID);
     }
-    Texture(GLuint tID, GLenum target) : m_texID(tID), m_target(target), m_tex_num(GL_TEXTURE0)
+    Texture(GLuint tID, GLenum target) : m_target(target), m_texID(tID), m_tex_num(GL_TEXTURE0)
     {}
     virtual ~Texture()
     {

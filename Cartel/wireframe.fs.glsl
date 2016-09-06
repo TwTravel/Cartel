@@ -2,8 +2,12 @@
 
 layout (location = 0) out vec4 FragColor;
 
-in vec3 LightIntensity;
-noperspective in vec3 dist; // distances from edges
+in wireData {
+    vec3 f_color;
+    vec3 dist_v;
+    vec3 selected;
+    noperspective vec3 dist; // distances from edges
+} inData;
 
 // 0x1 -> faces
 // 0x2 -> edges
@@ -17,7 +21,7 @@ struct LightInfo
     vec3 Ld;       // diffuse light
     vec3 Ls;       // specular light
 };
-uniform LightInfo Light;
+uniform LightInfo Light0;
 
 struct MaterialInfo
 {
@@ -30,13 +34,13 @@ uniform MaterialInfo Material;
 
 void main()
 {
-    float threshold = 1;
+    float threshold = 0.005;
 
     float tmp;
-    vec3  dst = dist;
+    vec3  dst = inData.dist;
     if (dst[2] < dst[1]) {
-        dst[1] = dist[2];
-        dst[2] = dist[1];
+        dst[1] = inData.dist[2];
+        dst[2] = inData.dist[1];
     }
     if (dst[1] < dst[0]) {
         tmp = dst[0];
@@ -48,21 +52,25 @@ void main()
     float edgeIntensity = smoothstep(0, 1, dst[0]);
 
     // calculate verts
-    float vert_dist = dst[0]*dst[0] + dst[1]*dst[1];
-    float vertIntensity = (vert_dist < threshold)
-                                  ? 0 : smoothstep(0, 1, 3*vert_dist);
-                                  //: 0;
+    vec3 dist_v = inData.dist_v;
+    int small = (dist_v[0] < dist_v[1]) ? 0 : 1;
+    small = (dist_v[small] < dist_v[2]) ? small : 2;
+
+    float vertIntensity = smoothstep(0, threshold, dist_v[small]);
 
     vec4 out_color = vec4(0, 0, 0, 0);
 
     if ((view_mode & 0x1) != 0) { // faces
-        out_color = vec4(LightIntensity, 1.0);
+        out_color = vec4(inData.f_color, 1.);
     }
     if ((view_mode & 0x2) != 0) { // edges
-        out_color = mix(vec4(1, 1, 1, 1.0), out_color, edgeIntensity);
+        out_color = mix(vec4(1, 1, 1, 1.), out_color, edgeIntensity);
     }
     if ((view_mode & 0x4) != 0) { // verts
-        out_color = mix(vec4(1, 0, 0, 1.0), out_color, vertIntensity);
+        if (inData.selected[small] > 0.5)
+            out_color = mix(vec4(1., 0., 0., 1.), out_color, vertIntensity);
+        else
+            out_color = mix(vec4(0., 0., 1., 1.), out_color, vertIntensity);
     }
 
     FragColor = out_color;

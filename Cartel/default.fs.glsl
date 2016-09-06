@@ -2,7 +2,10 @@
 
 layout (location = 0) out vec4 FragColor;
 
-in vec3 LightIntensity;
+in Data {
+    vec3 color;
+	vec2 texCoord;
+} inData;
 
 struct LightInfo
 {
@@ -11,7 +14,7 @@ struct LightInfo
     vec3 Ld;       // diffuse light
     vec3 Ls;       // specular light
 };
-uniform LightInfo Light;
+uniform LightInfo Light0;
 
 struct MaterialInfo
 {
@@ -20,9 +23,9 @@ struct MaterialInfo
     vec3 Ks;            // Specular reflectivity
     float Shininess;    // Specular shininess factor
 };
-uniform MaterialInfo Material;
+uniform MaterialInfo Material0;
 
 void main()
 {
-    FragColor = vec4(LightIntensity,1.0);
+    FragColor = vec4(inData.color,1.0);
 }

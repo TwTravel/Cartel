@@ -22,18 +22,10 @@
 #ifndef SHADER_UTILS_H
 #define SHADER_UTILS_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
-void buildShader(GLenum target, char *file, GLuint &shader);
+void buildShader(GLenum target, const char *file, GLuint &shader);
 GLuint buildProgram(int num_stages, GLuint *shaders);
 
 #endif

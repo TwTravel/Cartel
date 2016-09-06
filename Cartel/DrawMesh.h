@@ -17,16 +17,8 @@
 #ifndef DRAW_MESH_H
 #define DRAW_MESH_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #include <string>
 #include <vector>
@@ -46,41 +38,36 @@ class DrawMesh
 public:
     glm::mat4 m_MV;  // object's model transformations
 
-    DrawMesh(): m_num_elem(0), m_num_vbos(0), m_state(NULL), m_vbos(NULL)
+    DrawMesh(RenderState &r_state): m_num_elem(0), m_state(&r_state), m_vbos(0)
     {}
     ~DrawMesh();
     // takes the number of vbos and then a state which has enough space allocated for those vbos
     // AND an ibo
-    void init(int num_buffers, RenderState &state);
-    void drawMesh();
+    void init(int num_buffers);
+    void drawMesh(GLenum primitive = GL_TRIANGLES);
+
+    void addBuffer(int buff_num);
 
     // these functions copy the the data to our internally managed memory, to modify
     // existing memory, use "GetData()
-    void loadVBuffer(int buffer_num, int size, GLubyte *data, int data_offset, int num_attr, attrib_info *attr_info); // load data into the specified vertex buffer
+    void loadVBuffer(unsigned int buffer_num, int size, GLubyte *data, int data_offset, int num_attr, attrib_info *attr_info); // load data into the specified vertex buffer
     void loadIBuffer(int num_elem, int elem_size, int *data); // load data into the index buffer
-
-    void analyzeAttr(int attrib_num, float *&attrib_ptr, int &stride);
-
-    // a list of indexes is not always desired, and so can be ignored
-    void analyzeMesh(int &num_elements, int **indices = NULL);
 
     // return a pointer to our internal copy of buffer i
     const float *getData(int i) const {return m_vbos[i].m_local_data;}
     float *getData(int i) {return m_vbos[i].m_local_data;}
 
-    int    getNumVBO() {return m_num_vbos;}
-    void   syncGPU(int base, int extent=0);     // copy the changes to our local data to the GPU
+    int    getNumVBO() {return m_vbos.size();}
+    void   syncGPU(unsigned int base, size_t extent=0);     // copy the changes to our local data to the GPU
 
 private:
-
     void resizeBuffer(int size);            // resize the internal store for the buffer
 
     GLsizei  m_num_elem;
-    GLsizei  m_num_vbos;
     IBuffer  m_ibo;
 
     RenderState    *m_state;
-    VBuffer        *m_vbos;
+    vector<VBuffer> m_vbos;
 };
 
 #endif // DRAW_MESH

@@ -18,16 +18,21 @@
 #ifndef RENDER_STATE_H
 #define RENDER_STATE_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+#include <vector>
+using std::vector;
+
+
+struct attrib_info
+{
+    unsigned int attrib_number;  // which attribute within the mesh this info is for
+    unsigned int attrib_size;    // total size in bytes of one attribute
+    unsigned int num_comp;       // the number of components each of these atributes holds
+    unsigned int data_offset;    // the number of bytes from the start of the array to the first instance of this attribute
+    unsigned int data_stride;    // the number of bytes between instances of this attribute
+};
 
 /**
  * A RenderState object stores a collection of GPU vertex buffer objects to be used to render a
@@ -38,43 +43,77 @@
 class RenderState
 {
 public:
-    RenderState(unsigned int num_bufs)
+    RenderState()
     {
         glGenVertexArrays(1, &m_vaoID);
-
-        m_vboIDs = new GLuint[num_bufs];
-        glGenBuffers(num_bufs, m_vboIDs);
-
-        m_size = new GLuint[num_bufs];
-        for (int i = 0; i < num_bufs; i++)
-            m_size[i] = 0;
-
-        m_num_buffers = num_bufs;
     }
     ~RenderState()
     {
         glDeleteVertexArrays(1, &m_vaoID);
-        glDeleteBuffers(m_num_buffers, m_vboIDs);
-        delete [] m_vboIDs;
-        delete [] m_size;
+
+        if (!m_vboIDs.empty())
+            glDeleteBuffers(m_vboIDs.size(), &m_vboIDs[0]);
     }
     void bindVAO()
     {
         glBindVertexArray(m_vaoID);
     }
-    GLuint getBufferID(unsigned int i)
+    void bindVBO(unsigned int i, GLenum target = GL_ARRAY_BUFFER)
     {
+        glBindBuffer(target, operator[](i));
+    }
+
+    void bindIBO(unsigned int i)
+    { bindVBO(i, GL_ELEMENT_ARRAY_BUFFER); }
+
+
+    void setNextBufferData(std::size_t num_bytes, unsigned char *data)
+    {
+        setBufferData(dirty++, num_bytes, data);
+    }
+
+    void setBufferData(unsigned int i, std::size_t num_bytes, unsigned char *data = NULL)
+    {
+        bindVBO(i);
+        if (m_bytes[i] < num_bytes)
+        {
+            m_bytes[i] = num_bytes;
+            glBufferData(GL_ARRAY_BUFFER, num_bytes, data, GL_STATIC_DRAW); // Static, because all changes happen in the edit mesh
+        }
+        else
+            glBufferSubData(GL_ARRAY_BUFFER, 0, num_bytes, data);
+    }
+    void setAttributeData(attrib_info &info)
+    { setAttributeData(info.attrib_number, info.num_comp, info.data_offset, info.data_stride); }
+
+    void setAttributeData(unsigned int attrib_number, unsigned int num_comp, unsigned int data_offset, unsigned int data_stride)
+    {
+        glEnableVertexAttribArray(attrib_number);
+        glVertexAttribPointer(attrib_number, num_comp, GL_FLOAT, GL_FALSE,
+                              data_stride, (GLvoid *) data_offset);
+    }
+
+    GLuint operator[](unsigned int i)
+    {
+        if (i >= m_vboIDs.size())
+        {
+            m_vboIDs.resize(i+1, 0);
+            m_bytes.resize(i+1, 0);
+        }
+        if (m_vboIDs[i] == 0)
+            glGenBuffers(1, &m_vboIDs[i]);
         return m_vboIDs[i];
     }
-    GLuint *getBufferSize(unsigned int i)
-    {
-        return &m_size[i];
-    }
+
+    void makeClean()
+    { dirty = 0; }
+
 private:
-    GLuint  m_vaoID;
-    GLuint  m_num_buffers;
-    GLuint *m_vboIDs;
-    GLuint *m_size; // used to avoid needless resizing of buffers
+    int dirty; // used for loading to copy into appropriate buffers
+
+    GLuint m_vaoID;
+    vector<GLuint> m_vboIDs;
+    vector<GLuint> m_bytes; // used to avoid needless resizing of buffers
 };
 
 #endif // RENDER_STATE_H

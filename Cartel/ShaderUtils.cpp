@@ -21,7 +21,7 @@
 #include <iostream>
 #include <ctime>
 
-void buildShader(GLenum shaderType, char *path, GLuint &shader)
+void buildShader(GLenum shaderType, const char *path, GLuint &shader)
 {
     GLint  length        = 0;
     GLint  result        = GL_FALSE;

@@ -113,7 +113,7 @@ public:
     		}
             else if (key == "f")
             {
-    			int i = 0;
+    			unsigned int i = 0;
                 while (!str.eof())
                 {
                     a = b = c = 0;
@@ -149,7 +149,7 @@ public:
                 FaceVertexIndices fi;
                 fi.nodeCount = i;
                 fi.indices = new FaceVertexIndex[i];
-                for (int j=0; j < i ;j++)
+                for (unsigned int j=0; j < i ; ++j)
                     fi.indices[j] = indices[j];
                 faces.push_back(fi);
                 faceValence = (faceValence == i || faceValence == 0) ? i : -1;
@@ -159,7 +159,7 @@ public:
 
     ~ObjLoader()
     {
-        for (int i = 0; i < faces.size(); i++)
+        for (size_t i = 0; i < faces.size(); i++)
         {
             delete [] faces[i].indices;
         }
@@ -230,7 +230,7 @@ public:
         normals.resize(vertices.size());
 
         // iterate though faces
-        for (int i = 0; i < faces.size(); i++)
+        for (size_t i = 0; i < faces.size(); ++i)
         {
             int num_verts = faces[i].nodeCount;
             int normalIndices[4];
@@ -238,7 +238,7 @@ public:
             glm::vec3 n;
 
             // iterate through vertices in faces
-            for (int j = 0; j < num_verts; j++)
+            for (int j = 0; j < num_verts; ++j)
             {
                 int v_index = faces[i].indices[j].vertex;
                 // in openGL these two values must be proportional (according to the number of components)
@@ -284,7 +284,7 @@ private:
 
         out_indices = new int[m_num_indices];
 
-        for (int i = 0, j = 0; i < faces.size(); i++)
+        for (size_t i = 0, j = 0; i < faces.size(); ++i)
         {
             for (int k = 0; k < faces[i].nodeCount; k++, j++)
             {

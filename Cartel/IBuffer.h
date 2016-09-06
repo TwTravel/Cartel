@@ -17,16 +17,10 @@
 #ifndef IBUFFER_H
 #define IBUFFER_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+#include "RenderState.h"
 
 /**
  * The CPU side representation of a buffer used to store indices to index into the other vertex attributes.
@@ -38,9 +32,9 @@ class IBuffer
 public:
     // takes in its index within the mesh that owns it
     // this is used to keep track of attrib array number
-    IBuffer(): m_renderID(0), m_renderSize(NULL), m_local_data(NULL), m_elem_size(0), m_size(0)
+    IBuffer(): m_renderID(0), m_rState(NULL), m_local_data(NULL), m_elem_size(0), m_size(0)
     {}
-    IBuffer(GLuint bufferID, GLuint *rSize): m_renderID(bufferID), m_renderSize(rSize), m_local_data(NULL), m_elem_size(0), m_size(0)
+    IBuffer(GLuint bufferID, RenderState &r_state): m_renderID(bufferID), m_rState(&r_state), m_local_data(NULL), m_elem_size(0), m_size(0)
     {}
     ~IBuffer()
     {
@@ -48,22 +42,22 @@ public:
             delete [] m_local_data;
     }
 
-    void setRender(GLuint buffID, GLuint *size)
+    void setRender(GLuint buffID, RenderState &r_state)
     {
         m_renderID = buffID;
-        m_renderSize = size;
+        m_rState = &r_state;
     }
     void resizeBuffer(int size);
     void loadBuffer(int num_elem, int elem_size, int *data, int offset=0);
     void SyncBuffer();
-    void SyncBuffer(GLuint buffer, GLuint *size);
+    void SyncBuffer(GLuint buffer);
 
-    int      m_size;        // the size in BYTEs of our local data store
-    int      m_elem_size;   // the size of an individual index
-    GLubyte *m_local_data;  // our local copy of the mesh data that we can modify and copy to the gpu
+    int          m_size;        // the size in BYTEs of our local data store
+    int          m_elem_size;   // the size of an individual index
+    GLubyte     *m_local_data;     // our local copy of the mesh data that we can modify and copy to the gpu
 
-    GLuint   m_renderID;
-    GLuint  *m_renderSize;
+    GLuint       m_renderID;
+    RenderState *m_rState;
 };
 
 #endif // IBUFFER_H

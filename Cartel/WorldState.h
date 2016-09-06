@@ -27,18 +27,11 @@
 #ifndef WORLD_STATE_H
 #define WORLD_STATE_H
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #include <vector>
+#include <cstdio>
 #include <math.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -49,7 +42,7 @@
 // Lighting state
 struct LightInfo
 {
-    glm::vec4 Position;
+    glm::vec4 LPosition;
     glm::vec3 La;       // ambient light
     glm::vec3 Ld;       // diffuse light
     glm::vec3 Ls;       // specular light
@@ -57,7 +50,7 @@ struct LightInfo
 
     // some default initialization parameters
     LightInfo()
-    : Position(10.0, 6.0, 4.0, 1.0),
+    : LPosition(10.0, 6.0, 4.0, 1.0),
     La(0.9, 0.9, 0.9),
     Ld(1.0, 1.0, 1.0),
     Ls(1.0, 1.0, 1.0),
@@ -108,10 +101,18 @@ public:
     void loadTexture(unsigned int i);
     void loadTextures();
 
+    void resetProjection(float aspectRatio);
+    void resetView();
+    void resetModel();
+
+    void updateView(float vTheta, float vPhi, float vDepth, glm::vec3 vPan);
+
     //default initialized to the identity matrix
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 projection;
+    glm::vec3 cameraOrigin;
+
 
     std::vector<LightInfo>    lights;
     std::vector<MaterialInfo> materials;

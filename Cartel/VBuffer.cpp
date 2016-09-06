@@ -98,60 +98,17 @@ void VBuffer::loadBuffer(int data_size, GLubyte *data, int data_offset, int num_
 #endif
 }
 
-void VBuffer::analyzeAttr(int attrib_num, float *&attrib_ptr, int &stride)
-{
-    int i;
-    for (i = 0; i < m_num_attr; i++)
-    {
-        if (m_attr_info[i].attrib_number == attrib_num)
-            break;
-    }
-    if (i == m_num_attr)
-    {
-        attrib_ptr = NULL;
-        stride = 0;
-        return;
-    }
-    stride = m_attr_info[i].data_stride / sizeof(float); // stride is originally in bytes, not sizeof float
-    attrib_ptr = (float*)(((char*)m_local_data) + m_attr_info[i].data_offset);
-
-    if (stride == 0)
-        stride = m_attr_info[i].attrib_size / sizeof(float); // assume tightly packed
-}
-
 // copy all local data to the GPU
-// buffer: buffer to render to
-// the buffer's current size, can use 0 to always reallocate
-void VBuffer::SyncBuffer(GLuint buffer, GLuint *size)
+// \param specify a buffer other than the stored buffer to allocate to
+void VBuffer::SyncBuffer(GLuint buffer)
 {
-    // bind the correct VBO
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-
-    // ensure that the GPU has enough memory allocated
-    if (m_size > *size)
-    {
-        glBufferData(GL_ARRAY_BUFFER, m_size, m_local_data, GL_DYNAMIC_DRAW);
-        *size = m_size;
-    }
-    else
-        glBufferSubData(GL_ARRAY_BUFFER, 0, m_size, m_local_data);
+    m_rState->setBufferData(buffer, m_size, (unsigned char *)m_local_data);
 
     for (int i = 0; i < m_num_attr; ++i)
-    {
-        glEnableVertexAttribArray(m_attr_info[i].attrib_number);
-        glVertexAttribPointer(m_attr_info[i].attrib_number, m_attr_info[i].num_comp, GL_FLOAT, GL_FALSE,
-                              m_attr_info[i].data_stride, (GLvoid *) m_attr_info[i].data_offset);
-    }
+        m_rState->setAttributeData(m_attr_info[i]);
 }
 
 // copy all local data to the GPU using
 // stored buffer ID
 void VBuffer::SyncBuffer()
-{
-    if (m_renderID == 0)
-    {
-        fprintf(stderr, "Default Render Information not Populated, aborting\n");
-        return;
-    }
-    SyncBuffer(m_renderID, (m_renderSize == NULL) ? 0 : m_renderSize);
-}
+{ SyncBuffer(m_renderID); }

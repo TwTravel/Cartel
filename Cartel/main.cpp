@@ -16,16 +16,8 @@
 
 #define GLFW_INCLUDE_GLU
 
-#ifdef _WIN32
-#  include "GL/glew.h"
-#  include "GLFW/glfw3.h"
-# elif __APPLE__
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#else
-#  include <GL/glew.h>
-#  include <GLFW/glfw3.h>
-#endif
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 
@@ -36,151 +28,206 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/ext.hpp>
 
+#include <imgui.h>
+#include <imgui_impl_glfw_gl3.h>
+
 #include "ShaderUtils.h"
 #include "ControlState.h"
 #include "WorldState.h"
 #include "RenderState.h"
 #include "DrawMesh.h"
 #include "MeshUtils.h"
+#include "Utils.h"
 #include "TextureUtils.h"
 #include "TextureTypes.h"
-
 #include "EditMesh.h"
 
+// === Globals ===
 WorldState *w_state;
 RenderState *r_state[2];
-// NOTE: defined in ControlState.h 
-// ControlState c_state;
-
-int mesh_file_size = 4;
-int mesh_curr = 0;
-char *mesh_files[] = {"Mesh/horse.obj",
-                      "Mesh/camel.obj",
-                      "Mesh/cow_head.obj",
-                      "Mesh/cow1.obj"};
-Mesh *g_mesh;
+Model    *g_mesh;
 DrawMesh *g_axis; // NOTE: only a single axis
 
-// the display loop, where all of the code that actually
-// changes what you see goes
-void display()
-{
-    /* limit framerate to 60 fps */
-    double curr = 0;
-    if ((curr = glfwGetTime()) < 0.016666667) // curr < ~ 1/60
-        return;
+// === Mesh Files ===
+int mesh_curr = -1;
+int mesh_file_size = 8; // size of the array below
+const char *mesh_files[] = {"Mesh/camel.obj",
+							"Mesh/camel_simple.obj",
+                            "Mesh/cow_head.obj",
+                            "Mesh/cow1.obj",
+							"Mesh/cow2.obj",
+							"Mesh/cube.obj",
+							"Mesh/horse.obj",
+							"Mesh/octopus.obj"};
 
-    // start counting over
-    glfwSetTime(0.0);
 
+// main loop, does everything: poll events, update world, render
+void mainloop() {
+	glfwPollEvents();
+
+	ImGui_ImplGlfwGL3_NewFrame();
+	if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+			if (ImGui::MenuItem("Load Next", "L")) {
+				c_state.op = EDIT_LOAD_NEXT;
+			} 
+			ImGui::Separator();
+			for (int i = 0; i < mesh_file_size; ++i) {
+				if (ImGui::MenuItem(mesh_files[i], nullptr, (i == mesh_curr))) {
+					c_state.op = EDIT_RELOAD;
+					mesh_curr = i;
+				}
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Quit", "Q")) { glfwSetWindowShouldClose(c_state.window, GL_TRUE); }
+            ImGui::EndMenu();
+        }
+
+		if (ImGui::BeginMenu("View")) {
+			if (ImGui::MenuItem("Next", "N")) { c_state.view_mode = c_state.view_mode + 1 > VIEW_ALL ? VIEW_FACES : c_state.view_mode + 1; }
+			ImGui::Separator();
+			if (ImGui::MenuItem("Faces", "F", (c_state.view_mode & VIEW_FACES) > 0)) c_state.view_mode ^= VIEW_FACES;
+			if (ImGui::MenuItem("Edges", "E", (c_state.view_mode & VIEW_EDGES) > 0)) c_state.view_mode ^= VIEW_EDGES;
+			if (ImGui::MenuItem("Vertices", "V", (c_state.view_mode & VIEW_VERTS) > 0)) c_state.view_mode ^= VIEW_VERTS;
+			if (ImGui::MenuItem("Axis", "A", c_state.view_axis)) c_state.view_axis = !c_state.view_axis;
+			ImGui::EndMenu();
+		}
+
+		// CS 524: Feel free to edit and add entries below, remember that you also have to set keyboard events in ControlState.cpp (if you want them)
+        if (ImGui::BeginMenu("Edit")) {
+			if (ImGui::MenuItem("Clear Selection", "C")) { c_state.op = EDIT_CLEAR_SELECTION; }
+            if (ImGui::MenuItem("Item1", "1")) { printf("Item1 clicked\n"); /* c_state.op = EDIT_something; */ }
+            if (ImGui::MenuItem("Item2", "2")) { printf("Item2 clicked\n"); /* c_state.op = EDIT_something; */ }
+            if (ImGui::MenuItem("Item3", "3")) { printf("Item3 clicked\n"); /* c_state.op = EDIT_something; */ }
+            if (ImGui::MenuItem("Item4", "4")) { printf("Item4 clicked\n"); /* c_state.op = EDIT_something; */ }
+            if (ImGui::MenuItem("item5", "5")) { printf("Item5 clicked\n"); /* c_state.op = EDIT_something; */ }
+            ImGui::EndMenu();
+        }
+
+		// CS 524: You can also have buttons directly in the main bar
+		if (ImGui::Button("Item6")) { printf("Item6 clicked\n"); }
+		ImGui::SameLine(ImGui::GetWindowWidth() - 80);
+		ImGui::Text("(%.0f fps)", ImGui::GetIO().Framerate);
+        ImGui::EndMainMenuBar();
+    }
+
+	// CS 524: Or you can have a separate window
+	ImGui::Begin("Debug Window");
+	ImGui::Text("Hello, World");
+	if (ImGui::Button("Test Button")) { printf("Clicked!\n"); }
+	static char buf1[64] = ""; 
+	ImGui::InputText("", buf1, 64);
+	ImGui::End();
+	
     // Clear the buffer we will draw into.
-    glClearColor(0.549, 0.47, 0.937, 1);
+    glClearColor(0.549f, 0.47f, 0.937f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // Setup camera projection.
-    w_state->projection = glm::perspective(50.0f, c_state.aspectRatio(), 0.1f, 40.0f);
-
-    // Setup camera position/orientation.
-    w_state->view = glm::lookAt(
-        c_state.viewDepth * glm::vec3(0.0f, 2.5f, 10.0f), // eye
-                            glm::vec3(0.0f, 0.0f,  0.0f), // centre
-                            glm::vec3(0.0f, 1.0f,  0.0f)  // up
-    );
-
-    /* this would let you rotate the view with arrow keys
-     *  c_state.updateView(
-     *      c_state.deltaArrLR() * DEGREES_PER_SECOND * curr,
-     *      0,
-     *      c_state.deltaArrUD() * DEPTH_PER_SECOND * curr - c_state.mouseScroll + 0.00001 );
-     */
-    c_state.updateView(0, 0, -c_state.mouseScroll );
-    c_state.mouseScroll = 0;
-
-    w_state->view = glm::rotate(w_state->view, c_state.viewPhi, glm::vec3(1, 0, 0));
-    w_state->view = glm::rotate(w_state->view, c_state.viewTheta, glm::vec3(0, 1, 0));
+    // Setup camera
+    w_state->resetProjection(c_state.aspectRatio());
+    w_state->updateView(c_state.viewTheta, c_state.viewPhi,
+                        c_state.viewDepth, c_state.viewPan);
 
     /***********************************
-     * Apply pending filter
+     * Apply pending operation
      ***********************************/
-    switch(c_state.op)
-    {
-        case EDIT_SQRT3_SUBDIV:
-            g_mesh->subdivide_sqrt3();
-            c_state.op = EDIT_NONE;
-            break;
-        case EDIT_RELOCATE_VERTS:
-            g_mesh->remesh_relocate();
-            c_state.op = EDIT_NONE;
-            break;
-		case EDIT_COLLAPSE_EDIT:
-		case EDIT_COLLAPSE_FAST_EDIT:
-			{
-				std::size_t count = 5;
-				if( c_state.op == EDIT_COLLAPSE_FAST_EDIT )
-					count = 1000;
+    switch(c_state.op) {
+	case EDIT_LOAD_NEXT:
+		mesh_curr = (mesh_curr + 1) % mesh_file_size;
+		// fallthrough
+	case EDIT_RELOAD:
+		delete g_mesh;
+        g_mesh = loadModelFromFile(*r_state[0], mesh_files[mesh_curr]);
+		c_state.op = EDIT_NONE; // reset the operation
+		break;
+	case EDIT_SAVE_IMAGE:
+		c_state.op = EDIT_NONE;
+		break;
+	case EDIT_CLEAR_SELECTION:
+		g_mesh->get_editMesh()->deselect_allVerts();
+		c_state.op = EDIT_NONE;
+		break;
 
-				static std::size_t total = 0;
-				for( std::size_t i = 0; i < count; ++i, ++total )
-					g_mesh->collapse_edge();
-				std::clog << "Count: " << total << std::endl;
-			}
-			c_state.op = EDIT_NONE;
-			break;
-        case EDIT_AREA_RELOCATION:
-            g_mesh->remesh_areabased();
-            c_state.op = EDIT_NONE;
-            break;
-        case EDIT_DELAUNAY:
-            g_mesh->remesh_delaunay();
-            c_state.op = EDIT_NONE;
-            break;
-        case EDIT_REMESH:
-            g_mesh->remesh();
-            c_state.op = EDIT_NONE;
-            break;
-        case EDIT_PRETTY:
-            g_mesh->remesh_pretty();
-            c_state.op = EDIT_NONE;
-            break;
-		case EDIT_DEBUG:
-			{
-			std::ofstream fout( "debug.obj" );
-			g_mesh->get_edit_mesh().write_to_obj_stream( fout );
-			fout.close();
-			}
-        case EDIT_NONE:
-        default:
-            break;
+		// CS 524: you can add entry points for your functions here.
+		// Remember to set c_state.op either in ControlState (keyboard event handling) 
+		// or in the GUI event handlers above, or both!
+
+    case EDIT_NONE:
+    default:
+        break;
     }
 
-    if (c_state.reload)
-    {
-        delete g_mesh;
-        g_mesh = loadMeshFromFile(*r_state[0], mesh_files[mesh_curr]);
-        mesh_curr = (mesh_curr + 1) % mesh_file_size;
-        c_state.reload = false;
-    }
+	
 
     /***********************************
      * XYZ Axis Code
      ***********************************/
-    w_state->useProgram(0);
-    w_state->loadLights();
+	if (c_state.view_axis) {
+		w_state->useProgram(0);
+		w_state->loadLights();
 
-    //Draw X axis in red
-    w_state->loadColorMaterial(glm::vec4(1, 0, 0, 1));
-    w_state->loadObjectTransforms(glm::rotate(glm::mat4(),-90.0f, glm::vec3(0, 0, 1)));
-    g_axis->drawMesh();
+		//Draw X axis in red
+		w_state->loadColorMaterial(glm::vec4(1, 0, 0, 1));
+		w_state->loadObjectTransforms(glm::rotate(glm::mat4(),-90.0f, glm::vec3(0, 0, 1)));
+		g_axis->drawMesh();
 
-    //Draw Y axis in green
-    w_state->loadColorMaterial(glm::vec4(0, 1, 0, 1));
-    w_state->loadTransforms();
-    g_axis->drawMesh();
+		//Draw Y axis in green
+		w_state->loadColorMaterial(glm::vec4(0, 1, 0, 1));
+		w_state->loadTransforms();
+		g_axis->drawMesh();
 
-    //Draw Z axis in blue
-    w_state->loadColorMaterial(glm::vec4(0, 0, 1, 1));
-    w_state->loadObjectTransforms(glm::rotate(glm::mat4(),90.0f, glm::vec3(1, 0, 0)));
-    g_axis->drawMesh();
+		//Draw Z axis in blue
+		w_state->loadColorMaterial(glm::vec4(0, 0, 1, 1));
+		w_state->loadObjectTransforms(glm::rotate(glm::mat4(),90.0f, glm::vec3(1, 0, 0)));
+		g_axis->drawMesh();
+	}
+
+    /*************************************
+     * Update Selection
+     *************************************/
+    glm::vec3 s_bl, s_tr;
+    c_state.getMouseSelection(s_bl, s_tr);
+    if (c_state.select_dirty)
+	{
+        w_state->useProgram(2);
+
+        //determine which vertices are in the selection box
+	    GLint select_viewport[4];
+	    glGetIntegerv(GL_VIEWPORT,select_viewport);
+	    glm::vec3 bl     = glm::unProject(glm::vec3(s_bl.x,s_bl.y,0), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 bl_ray = glm::unProject(glm::vec3(s_bl.x,s_bl.y,1), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 br     = glm::unProject(glm::vec3(s_tr.x,s_bl.y,0), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 br_ray = glm::unProject(glm::vec3(s_tr.x,s_bl.y,1), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 tr     = glm::unProject(glm::vec3(s_tr.x,s_tr.y,0), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 tr_ray = glm::unProject(glm::vec3(s_tr.x,s_tr.y,1), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 tl     = glm::unProject(glm::vec3(s_bl.x,s_tr.y,0), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+	    glm::vec3 tl_ray = glm::unProject(glm::vec3(s_bl.x,s_tr.y,1), w_state->view * w_state->model, w_state->projection, glm::vec4(0.0,0.0,select_viewport[2],select_viewport[3]));
+
+        int vert_size = g_mesh->info_sizev();
+	    for (int i = 0; i < vert_size; i++)
+	    {
+		    Eigen::Vector3d vert = g_mesh->info_vertex(i);
+		    if (vert_inside_select_box(Eigen::Vector3d(bl.x,bl.y,bl.z),
+								       Eigen::Vector3d(bl_ray.x,bl_ray.y,bl_ray.z),
+                                       Eigen::Vector3d(br.x,br.y,br.z),
+                                       Eigen::Vector3d(br_ray.x,br_ray.y,br_ray.z),
+                                       Eigen::Vector3d(tr.x,tr.y,tr.z),
+                                       Eigen::Vector3d(tr_ray.x,tr_ray.y,tr_ray.z),
+                                       Eigen::Vector3d(tl.x,tl.y,tl.z),
+                                       Eigen::Vector3d(tl_ray.x,tl_ray.y,tl_ray.z),
+								       vert))
+		    {
+                if (c_state.modShft) {
+                    g_mesh->deselect_vert(i);
+                }
+                else {
+                    g_mesh->select_vert(i);
+                }
+		    }
+	    }
+
+        c_state.select_dirty = false;
+    }
 
     /***********************************
      * Mesh Code
@@ -195,26 +242,32 @@ void display()
     w_state->loadMaterials();
     w_state->loadLights();
     w_state->loadTextures();
-    g_mesh->drawMesh();
-    
+
+    if (g_mesh) g_mesh->drawMesh();
+
     /*************************************
      * Draw Selection Box
      *************************************/
-    w_state->useProgram(2);
-    glm::vec3 s_bl, s_tr;
-    c_state.getMouseSelection(s_bl, s_tr);
+    if (c_state.select_active) {
+        w_state->useProgram(2);
 
-    glUniform3fv(glGetUniformLocation(w_state->getCurrentProgram(),"bot_left"), 1, glm::value_ptr(s_bl));
-    glUniform3fv(glGetUniformLocation(w_state->getCurrentProgram(),"top_right"), 1, glm::value_ptr(s_tr));
-    drawBox(s_bl.x, s_bl.y, s_tr.x, s_tr.y);
+        glUniform3fv(glGetUniformLocation(w_state->getCurrentProgram(),"bot_left"), 1, glm::value_ptr(s_bl));
+        glUniform3fv(glGetUniformLocation(w_state->getCurrentProgram(),"top_right"), 1, glm::value_ptr(s_tr));
 
+        drawBox(s_bl.x, s_bl.y, s_tr.x, s_tr.y);
+    }
+
+	/*************************************
+     * Draw GUI
+     *************************************/
+	ImGui::Render();
+
+	//glfwSwapInterval(0); // uncomment to make the renderer not wait for v-sync, pushing frames as quickly as possible, mostly for benchmarking (and fun).
     glfwSwapBuffers(c_state.window);
-    glfwPollEvents();
 }
 
 // setup
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 	EditMesh::test();
 
     GLenum err = 0;
@@ -263,8 +316,8 @@ int main(int argc, char *argv[])
     // must be setup after glew so that GL array
     // objects exist
 
-    r_state[0] = new RenderState(3);
-    r_state[1] = new RenderState(3);
+    r_state[0] = new RenderState();
+    r_state[1] = new RenderState();
 
     /*********************************************
      * SHADER SETUP
@@ -301,20 +354,17 @@ int main(int argc, char *argv[])
     w_state->loadLights();
     w_state->loadMaterials();
 
+	/*********************************************
+     * SETUP IMGUI
+     *********************************************/
+    ImGui_ImplGlfwGL3_Init(c_state.window, false);
+
     /*********************************************
      * LOAD MESH
      *********************************************/
-	//g_mesh = loadMeshFromFile(*r_state[0], "Mesh/cube.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "debug.obj");
-    g_mesh = loadMeshFromFile(*r_state[0], "Mesh/camel.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "Mesh/cow1.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "Mesh/cow_head.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "Mesh/cow_ear.obj");
-    //g_mesh = loadMeshFromFile(*r_state[0], "Mesh/camel_simple.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "Mesh/cow2.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "Mesh/octopus.obj");
-    //g_mesh = loadMeshFromFile(*r_state[0], "Mesh/camel.obj");
-	//g_mesh = loadMeshFromFile(*r_state[0], "D:/Darcy/Development/CPSC 524 Project/Cartel/debug.obj");
+	// instruct the mainloop to load the mesh at the first iteration
+	mesh_curr = 2; // you can set the default model to load, or -1 for none at all.
+	c_state.op = EDIT_RELOAD;
 
     g_axis = createAxis(*r_state[1], 1);
 
@@ -326,18 +376,20 @@ int main(int argc, char *argv[])
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     /*********************************************
-     * RENDER LOOP
+     * MAIN LOOP
      *********************************************/
     printHelp();
-    glfwSetTime(0.0);
+
     while (!glfwWindowShouldClose(c_state.window))
-        display();
+        mainloop();
 
     /*********************************************
      * CLEAN UP
      *********************************************/
     delete g_mesh;
     delete g_axis;
+
+	ImGui_ImplGlfwGL3_Shutdown();
 
     glfwTerminate();
 

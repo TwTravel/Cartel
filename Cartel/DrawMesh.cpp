@@ -20,39 +20,37 @@
 #include "Utils.h"
 
 DrawMesh::~DrawMesh()
-{
-    if (m_vbos != NULL)
-        delete [] m_vbos;
-}
+{}
 
-void DrawMesh::init(int num_buffers, RenderState &state)
+void DrawMesh::init(int num_buffers)
 {
-    state.bindVAO();
+    m_state->bindVAO();
 
-    m_vbos = new VBuffer[num_buffers];
-    if (!m_vbos)
-        fprintf(stderr, "Could not allocate buffer\n");
+    m_vbos.resize(num_buffers);
 
     // set the buffer IDs that the buffer objects will use
-    m_ibo.setRender(state.getBufferID(0), state.getBufferSize(0));
+    m_ibo.setRender(0, *m_state);
     for (int i = 0; i < num_buffers; i++)
-        m_vbos[i].setRender(state.getBufferID(i+1), state.getBufferSize(i+1));
-
-    m_num_vbos = num_buffers;
-    m_state = &state;
+        m_vbos[i].setRender(i+1, *m_state);
 }
 
-void DrawMesh::drawMesh()
+void DrawMesh::drawMesh(GLenum primitive)
 {
     m_state->bindVAO();
     syncGPU(0, 0);
-    glDrawElements(GL_TRIANGLES, m_num_elem, GL_UNSIGNED_INT, 0);
+    glDrawElements(primitive, m_num_elem, GL_UNSIGNED_INT, 0);
 }
 
-void DrawMesh::loadVBuffer(int buffer_num, int data_size, GLubyte *data, int data_offset, int num_attr, attrib_info *attr_info)
+void DrawMesh::addBuffer(int buff_num)
 {
-    if (buffer_num < 0 && buffer_num > m_num_vbos)
-        return;
+    m_vbos.push_back(VBuffer(buff_num, *m_state));
+    m_vbos[buff_num].m_renderID = m_vbos[buff_num].m_renderID+1;
+}
+
+void DrawMesh::loadVBuffer(unsigned int buffer_num, int data_size, GLubyte *data, int data_offset, int num_attr, attrib_info *attr_info)
+{
+    if (buffer_num >= m_vbos.size())
+        addBuffer(buffer_num);
 
     m_vbos[buffer_num].loadBuffer(data_size, data, data_offset, num_attr, attr_info);
 }
@@ -65,38 +63,18 @@ void DrawMesh::loadIBuffer(int num_elem, int elem_size, int *data)
     m_num_elem = num_elem;
 }
 
-void DrawMesh::analyzeAttr(int attrib_num, float *&attrib_ptr, int &stride)
-{
-    for (int i = 0; i < m_num_vbos; i++)
-    {
-        m_vbos[i].analyzeAttr(attrib_num, attrib_ptr, stride);
-        if (attrib_ptr != NULL)
-            break;
-    }
-}
-
-void DrawMesh::analyzeMesh(int &num_elements, int **indices)
-{
-    num_elements = m_num_elem;
-
-    if (indices)
-        *indices = (int*)m_ibo.m_local_data;
-}
-
 // by having a range, we can choose to only update the buffers we have changed
 // extent is the number of buffers after the base index to update
-void DrawMesh::syncGPU(int base, int extent)
+void DrawMesh::syncGPU(unsigned int base, size_t extent)
 {
-    if (base + extent > m_num_vbos ||
+    if (base + extent > m_vbos.size() ||
         extent == 0)
-        extent = m_num_vbos - base;
+        extent = m_vbos.size() - base;
 
     // bind the vertex array object to store all the vertex settings
     m_state->bindVAO();
-    for (int i=base; i < extent; i++)
-    {
+    for (unsigned int i=base; i < extent; i++)
         m_vbos[i].SyncBuffer();
-    }
 
     m_ibo.SyncBuffer();
 }

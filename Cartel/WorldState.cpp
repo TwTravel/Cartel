@@ -14,9 +14,11 @@
  * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <stdio.h>
+
 #include "WorldState.h"
 
-WorldState::WorldState()
+WorldState::WorldState() : cameraOrigin(0.0f, 2.5f, 10.0f)
 {
     // make sure that the world can hold at least 5 of each object
     // before it needs to reallocate memory
@@ -28,6 +30,10 @@ WorldState::WorldState()
     // start with one light and material by default
     lights.push_back(LightInfo());
     materials.push_back(MaterialInfo());
+
+    resetProjection(1.0f);
+    resetView();
+    // model is default identity
 }
 
 WorldState::~WorldState()
@@ -79,14 +85,14 @@ void WorldState::loadObjectTransforms(glm::mat4 oM)
 void WorldState::loadLight(unsigned int i)
 {
     // Load lights based on their index so as not to overwrite other lights.
-    char position[20], la[20], ld[20], ls[20], intensity[20];
-    sprintf(position, "Light%d.Position\0",i);
-    sprintf(la, "Light%d.La\0",i);
-    sprintf(ld, "Light%d.Ld\0",i);
-    sprintf(ls, "Light%d.Ls\0",i);
-    sprintf(intensity, "Light%d.Intensity\0",i);
+    char lposition[20], la[20], ld[20], ls[20], intensity[20];
+    sprintf(lposition, "Light%d.LPosition\0", i);	// do not remove the \0 or you'll break shaders
+    sprintf(la, "Light%d.La\0", i);
+    sprintf(ld, "Light%d.Ld\0", i);
+    sprintf(ls, "Light%d.Ls\0", i);
+    sprintf(intensity, "Light%d.Intensity\0", i);
     
-    glUniform4fv(glGetUniformLocation(shaders[currentProgram], position), 1, glm::value_ptr(lights[i].Position));
+    glUniform4fv(glGetUniformLocation(shaders[currentProgram], lposition), 1, glm::value_ptr(lights[i].LPosition));
     glUniform3fv(glGetUniformLocation(shaders[currentProgram], la), 1, glm::value_ptr(lights[i].La));
     glUniform3fv(glGetUniformLocation(shaders[currentProgram], ld), 1, glm::value_ptr(lights[i].Ld));
     glUniform3fv(glGetUniformLocation(shaders[currentProgram], ls), 1, glm::value_ptr(lights[i].Ls));
@@ -101,10 +107,19 @@ void WorldState::loadLights()
 
 void WorldState::loadMaterial(unsigned int i)
 {
-    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material.Ka"), 1, glm::value_ptr(materials[i].Ka));
-    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material.Kd"), 1, glm::value_ptr(materials[i].Kd));
-    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material.Ks"), 1, glm::value_ptr(materials[i].Ks));
-    glUniform1f(glGetUniformLocation(shaders[currentProgram], "Material.Shininess"), materials[i].Shininess);
+    // Load lights based on their index so as not to overwrite other lights.
+    char ka[20], kd[20], ks[20], shininess[20];
+    sprintf(ka, "Material%d.Ka\0", i);
+    sprintf(kd, "Material%d.Kd\0", i);
+    sprintf(ks, "Material%d.Ks\0", i);
+    sprintf(shininess, "Material%d.Shininess\0", i);
+
+	//printf("%f %f %f\n", materials[i].Ka);
+
+    glUniform3fv(glGetUniformLocation(shaders[currentProgram], ka), 1, glm::value_ptr(materials[i].Ka));
+    glUniform3fv(glGetUniformLocation(shaders[currentProgram], kd), 1, glm::value_ptr(materials[i].Kd));
+    glUniform3fv(glGetUniformLocation(shaders[currentProgram], ks), 1, glm::value_ptr(materials[i].Ks));
+    glUniform1f(glGetUniformLocation(shaders[currentProgram], shininess), materials[i].Shininess);
 }
 
 void WorldState::loadMaterials()
@@ -116,16 +131,16 @@ void WorldState::loadMaterials()
 
 void WorldState::loadColorMaterial(glm::vec4 color)
 {
-    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material.Ka"), 1, glm::value_ptr(glm::vec3(color)));
-    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material.Kd"), 1, glm::value_ptr(glm::vec3(0.6, 0.6, 0.6)));
-    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material.Ks"), 1, glm::value_ptr(glm::vec3(0.6, 0.6, 0.6)));
-    glUniform1f(glGetUniformLocation(shaders[currentProgram], "Material.Shininess"), 0.5f);
+    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material0.Ka\0"), 1, glm::value_ptr(glm::vec3(color)));
+    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material0.Kd\0"), 1, glm::value_ptr(glm::vec3(0.6, 0.6, 0.6)));
+    glUniform3fv(glGetUniformLocation(shaders[currentProgram], "Material0.Ks\0"), 1, glm::value_ptr(glm::vec3(0.6, 0.6, 0.6)));
+    glUniform1f(glGetUniformLocation(shaders[currentProgram], "Material0.Shininess\0"), 0.5f);
 }
 
 void WorldState::loadTexture(unsigned int i)
 {
     char texsampler[20];
-    sprintf(texsampler, "TexSampler%d\0",textures[i].m_tex_num);
+    sprintf(texsampler, "TexSampler%d", textures[i].m_tex_num);
 
     glUniform1i(glGetUniformLocation(shaders[currentProgram], texsampler), textures[i].m_tex_num);
 }
@@ -134,4 +149,36 @@ void WorldState::loadTextures()
 {
     for (unsigned int i = 0; i < textures.size(); i++)
         loadTexture(i);
+}
+
+void WorldState::resetProjection(float aspectRatio)
+{
+    projection = glm::perspective(50.0f, aspectRatio, 0.1f, 40.0f);
+}
+
+void WorldState::resetView()
+{
+    // Setup camera position/orientation.
+    view = glm::lookAt(glm::vec3(0.0f, 2.5f, 10.0f), // eye
+                       glm::vec3(0.0f, 0.0f,  0.0f), // centre
+                       glm::vec3(0.0f, 1.0f,  0.0f)  // up
+    );
+}
+
+void WorldState::resetModel()
+{
+    model = glm::mat4();
+}
+
+void WorldState::updateView(float vTheta, float vPhi, float vDepth, glm::vec3 vPan)
+{
+    // Setup camera position/orientation.
+    glm::mat4 camera = glm::lookAt(
+        vDepth * cameraOrigin, // eye
+        glm::vec3(0, 0, 0), // centre
+        glm::vec3(0.0f, 1.0f,  0.0f)  // up
+    );
+    view = glm::rotate(camera, vPhi, glm::vec3(1, 0, 0));
+    view = glm::rotate(view, vTheta, glm::vec3(0, 1, 0));
+    view = glm::translate(view, glm::mat3(glm::inverse(view)) * vPan);
 }

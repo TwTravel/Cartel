@@ -18,6 +18,7 @@
 #define CONTROL_STATE_H
 
 #include "WorldState.h"
+#include <set>
 
 /* due to GLFW/glut/most windowing systems being c based it is infeasible to store 
  * all the control state within our class and pass member function pointers (the c 
@@ -43,6 +44,10 @@ enum RENDER_MODE
 enum EDIT_OPERATION
 {
     EDIT_NONE = 0,
+	EDIT_RELOAD,
+	EDIT_LOAD_NEXT,
+	EDIT_SAVE_IMAGE,
+	EDIT_CLEAR_SELECTION,
     EDIT_SQRT3_SUBDIV,
     EDIT_RELOCATE_VERTS,
 	EDIT_COLLAPSE_EDIT,
@@ -53,11 +58,13 @@ enum EDIT_OPERATION
     EDIT_PRETTY,
 	EDIT_DEBUG,
     EDIT_MAX,
+	// CS 524: Add new operations here
 };
 
 class ControlState
 {
 public:
+    glm::vec3 viewPan;
     float viewTheta;
     float viewPhi;
     float viewDepth;
@@ -68,13 +75,16 @@ public:
     bool arrU;
     bool arrD;
 
+    // key state saved
+    bool modShft;
+
     // the current mouse position, updated by the mousePose_callback function
-    int mouseX;
-    int mouseY;
+    float mouseX;
+    float mouseY;
     bool mouseEvent; // did the mouse state just change, or is it held
     bool mouseBtnL;
     bool mouseBtnC;
-    bool mouseBtnR;
+    bool mouseBtnR; // currently denotes that the selection is active
 
     // unprocessed mouse scroll amount
     float mouseScroll;
@@ -88,19 +98,23 @@ public:
     GLFWwindow* window;
     WorldState* w;
 
-    //program specific control scheme
+    // selection variables
     glm::vec3 select_start;
-    glm::vec3 select_curr;
     glm::vec3 select_end;
-    RENDER_MODE mode;
+    bool      select_active;
+    bool      select_dirty;  // requires processing
+
+    //program specific control scheme
+    RENDER_MODE    mode;
     EDIT_OPERATION op;
-    int view_mode;
-    bool reload;
+    int            view_mode;
+	bool		   view_axis;
+    double         zoom_step;
 
     ControlState()
         : viewTheta(0),
           viewPhi(0),
-          viewDepth(1),
+          viewDepth(0.2f),
           arrL(0), arrR(0),
           arrU(0), arrD(0),
           mouseX(0), mouseY(0),
@@ -109,7 +123,8 @@ public:
           window(NULL), w(NULL),
           mode(MODE_SELECT),
           view_mode(VIEW_FACES | VIEW_EDGES),
-          op(EDIT_NONE)
+          op(EDIT_NONE),
+		  view_axis(true)
     {}
 
     ~ControlState();
@@ -131,22 +146,30 @@ public:
 
     int deltaArrLR();
     int deltaArrUD();
-    void updateView(float dTheta, float dPhi, float dDepth);
+    void clearViewDeltas();
 
-    void getMouseSelection (glm::vec3 &bottomleft, glm::vec3 &topright)
+    // returns true if selection is active or not yet processed
+    // false otherwise
+    bool getMouseSelection (glm::vec3 &bottomleft, glm::vec3 &topright)
     {
-        if (select_start.x > select_curr.x)
-        { bottomleft.x = select_curr.x;
+        if (select_start.x > select_end.x)
+        { bottomleft.x = select_end.x;
           topright.x = select_start.x; }
         else
         { bottomleft.x = select_start.x;
-          topright.x = select_curr.x; }
-        if (select_start.y > select_curr.y)
-        { bottomleft.y = select_curr.y;
+          topright.x = select_end.x; }
+        if (select_start.y > select_end.y)
+        { bottomleft.y = select_end.y;
           topright.y = select_start.y; }
         else
         { bottomleft.y = select_start.y;
-          topright.y = select_curr.y; }
+          topright.y = select_end.y; }
+
+        return select_dirty || select_active;
+    }
+
+    void markSelectionProcessed() {
+        select_dirty = false;
     }
 };
 extern ControlState c_state;
@@ -157,6 +180,7 @@ extern void printHelp();
 static void error_callback(int error, const char* desc);
 static void reshape_callback(GLFWwindow* win, int w, int h);
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
+static void char_callback(GLFWwindow* window, unsigned int c);
 static void mouseBtn_callback(GLFWwindow* win, int button, int action, int mod);
 static void mousePos_callback(GLFWwindow* win, double x, double y);
 static void mouseScroll_callback(GLFWwindow* win, double x_offset, double y_offset);
