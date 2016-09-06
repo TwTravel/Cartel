@@ -162,6 +162,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         if (action == GLFW_RELEASE)
             c_state.mode = (RENDER_MODE)((c_state.mode + 1) % MODE_MAX);
         break;
+	case GLFW_KEY_S:
+		if (action == GLFW_RELEASE) c_state.op = EDIT_SAVE_IMAGE;
+		break;
 
     case GLFW_KEY_N:
         if (action == GLFW_RELEASE) c_state.view_mode = c_state.view_mode + 1 > VIEW_ALL ? VIEW_FACES : c_state.view_mode + 1;

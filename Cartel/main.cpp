@@ -42,6 +42,9 @@
 #include "TextureTypes.h"
 #include "EditMesh.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "include\stb_image_write.h"
+
 // === Globals ===
 WorldState *w_state;
 RenderState *r_state[2];
@@ -79,6 +82,7 @@ void mainloop() {
 				}
 			}
 			ImGui::Separator();
+			if (ImGui::MenuItem("Save Image", "S")) { c_state.op = EDIT_SAVE_IMAGE; }
 			if (ImGui::MenuItem("Quit", "Q")) { glfwSetWindowShouldClose(c_state.window, GL_TRUE); }
             ImGui::EndMenu();
         }
@@ -140,9 +144,8 @@ void mainloop() {
         g_mesh = loadModelFromFile(*r_state[0], mesh_files[mesh_curr]);
 		c_state.op = EDIT_NONE; // reset the operation
 		break;
-	case EDIT_SAVE_IMAGE:
-		c_state.op = EDIT_NONE;
-		break;
+	case EDIT_SAVE_IMAGE: 
+		break; // cannot parse it here, since the frame is not rendered yet
 	case EDIT_CLEAR_SELECTION:
 		g_mesh->get_editMesh()->deselect_allVerts();
 		c_state.op = EDIT_NONE;
@@ -264,6 +267,29 @@ void mainloop() {
 
 	//glfwSwapInterval(0); // uncomment to make the renderer not wait for v-sync, pushing frames as quickly as possible, mostly for benchmarking (and fun).
     glfwSwapBuffers(c_state.window);
+
+	
+	/*************************************
+     * Capture screenshot
+     *************************************/
+	if (c_state.op == EDIT_SAVE_IMAGE) {
+		const unsigned int bytesPerPixel = 3; // RGB
+		unsigned char* pixels = new unsigned char[bytesPerPixel * c_state.width * c_state.height];
+		glReadPixels(0, 0, c_state.width, c_state.height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+		for (int y = 0; y < c_state.height / 2; ++y) {
+			const int y2 = c_state.height - y - 1;
+			for (int x = 0; x < c_state.width; ++x) {
+				const int offset1 = bytesPerPixel * (x + y * c_state.width);
+				const int offset2 = bytesPerPixel * (x + y2 * c_state.width);
+				std::swap(pixels[offset1 + 0], pixels[offset2 + 0]);
+				std::swap(pixels[offset1 + 1], pixels[offset2 + 1]);
+				std::swap(pixels[offset1 + 2], pixels[offset2 + 2]);
+			}
+		}
+		stbi_write_png("capture.png", c_state.width, c_state.height, 3, pixels, 0);
+		delete pixels;
+		c_state.op = EDIT_NONE;
+	}
 }
 
 // setup
