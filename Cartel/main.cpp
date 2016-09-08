@@ -43,7 +43,7 @@
 #include "EditMesh.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "include\stb_image_write.h"
+#include "include/stb_image_write.h"
 
 // === Globals ===
 WorldState *w_state;
@@ -287,7 +287,7 @@ void mainloop() {
 			}
 		}
 		stbi_write_png("capture.png", c_state.width, c_state.height, 3, pixels, 0);
-		delete pixels;
+		delete[] pixels;
 		c_state.op = EDIT_NONE;
 	}
 }
