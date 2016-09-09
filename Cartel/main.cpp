@@ -116,12 +116,12 @@ void mainloop() {
     }
 
 	// CS 524: Or you can have a separate window
-	ImGui::Begin("Debug Window");
-	ImGui::Text("Hello, World");
-	if (ImGui::Button("Test Button")) { printf("Clicked!\n"); }
-	static char buf1[64] = ""; 
-	ImGui::InputText("", buf1, 64);
-	ImGui::End();
+	// ImGui::Begin("Debug Window");
+	// ImGui::Text("Hello, World");
+	// if (ImGui::Button("Test Button")) { printf("Clicked!\n"); }
+	// static char buf1[64] = ""; 
+	// ImGui::InputText("", buf1, 64);
+	// ImGui::End();
 	
     // Clear the buffer we will draw into.
     glClearColor(0.549f, 0.47f, 0.937f, 1.0f);
