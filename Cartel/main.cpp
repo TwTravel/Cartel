@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <math.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -68,6 +69,9 @@ const char *mesh_files[] = {"Mesh/camel.obj",
 void mainloop() {
 	glfwPollEvents();
 
+	static bool simplify_window_open = true;
+	static int simplify_n_operations = 1;
+
 	ImGui_ImplGlfwGL3_NewFrame();
 	if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -89,6 +93,7 @@ void mainloop() {
 
 		if (ImGui::BeginMenu("View")) {
 			if (ImGui::MenuItem("Next", "N")) { c_state.view_mode = c_state.view_mode + 1 > VIEW_ALL ? VIEW_FACES : c_state.view_mode + 1; }
+			if (ImGui::MenuItem("Reset View", "R")) { c_state.clearViewDeltas(); }
 			ImGui::Separator();
 			if (ImGui::MenuItem("Faces", "F", (c_state.view_mode & VIEW_FACES) > 0)) c_state.view_mode ^= VIEW_FACES;
 			if (ImGui::MenuItem("Edges", "E", (c_state.view_mode & VIEW_EDGES) > 0)) c_state.view_mode ^= VIEW_EDGES;
@@ -100,6 +105,7 @@ void mainloop() {
 		// CS 524: Feel free to edit and add entries below, remember that you also have to set keyboard events in ControlState.cpp (if you want them)
         if (ImGui::BeginMenu("Edit")) {
 			if (ImGui::MenuItem("Clear Selection", "C")) { c_state.op = EDIT_CLEAR_SELECTION; }
+			if (ImGui::MenuItem("Simplify", "", simplify_window_open)) { simplify_window_open = !simplify_window_open; }
             if (ImGui::MenuItem("Item1", "1")) { printf("Item1 clicked\n"); /* c_state.op = EDIT_something; */ }
             if (ImGui::MenuItem("Item2", "2")) { printf("Item2 clicked\n"); /* c_state.op = EDIT_something; */ }
             if (ImGui::MenuItem("Item3", "3")) { printf("Item3 clicked\n"); /* c_state.op = EDIT_something; */ }
@@ -116,12 +122,14 @@ void mainloop() {
     }
 
 	// CS 524: Or you can have a separate window
-	// ImGui::Begin("Debug Window");
-	// ImGui::Text("Hello, World");
-	// if (ImGui::Button("Test Button")) { printf("Clicked!\n"); }
-	// static char buf1[64] = ""; 
-	// ImGui::InputText("", buf1, 64);
-	// ImGui::End();
+	if (simplify_window_open) {
+		ImGui::Begin("Mesh Simplification");
+		// feel free to add more controls
+		ImGui::SliderInt("Number operations", &simplify_n_operations, 1, 100);
+		if (ImGui::Button("Vertex Removal Simplification")) { }
+		if (ImGui::Button("Edge Collapse Simplification")) { }
+		ImGui::End();
+	}
 	
     // Clear the buffer we will draw into.
     glClearColor(0.549f, 0.47f, 0.937f, 1.0f);
@@ -151,6 +159,16 @@ void mainloop() {
 		c_state.op = EDIT_NONE;
 		break;
 
+	case EDIT_SIMPLIFIY_VERTEX_REMOVAL:
+		g_mesh->get_editMesh()->simplify_vertex_removal(simplify_n_operations);
+		c_state.op = EDIT_NONE;
+		break;
+
+	case EDIT_SIMPLIFY_EDGE_COLLAPSE:
+		g_mesh->get_editMesh()->simplify_edge_collapse(simplify_n_operations);
+		c_state.op = EDIT_NONE;
+		break;
+
 		// CS 524: you can add entry points for your functions here.
 		// Remember to set c_state.op either in ControlState (keyboard event handling) 
 		// or in the GUI event handlers above, or both!
@@ -171,7 +189,7 @@ void mainloop() {
 
 		//Draw X axis in red
 		w_state->loadColorMaterial(glm::vec4(1, 0, 0, 1));
-		w_state->loadObjectTransforms(glm::rotate(glm::mat4(),-90.0f, glm::vec3(0, 0, 1)));
+		w_state->loadObjectTransforms(glm::rotate(glm::mat4(), static_cast<float>(-M_PI_2), glm::vec3(0, 0, 1)));
 		g_axis->drawMesh();
 
 		//Draw Y axis in green
@@ -181,7 +199,7 @@ void mainloop() {
 
 		//Draw Z axis in blue
 		w_state->loadColorMaterial(glm::vec4(0, 0, 1, 1));
-		w_state->loadObjectTransforms(glm::rotate(glm::mat4(),90.0f, glm::vec3(1, 0, 0)));
+		w_state->loadObjectTransforms(glm::rotate(glm::mat4(), static_cast<float>(M_PI_2), glm::vec3(1, 0, 0)));
 		g_axis->drawMesh();
 	}
 
@@ -352,10 +370,9 @@ int main(int argc, char *argv[]) {
     GLuint shaderProgram[3] = {0};
     GLuint shaders[3] = {0};
 
+	// create axis shader program
     buildShader(GL_VERTEX_SHADER, "axes.vs.glsl", shaders[0]);
     buildShader(GL_FRAGMENT_SHADER, "default.fs.glsl", shaders[1]);
-
-    // create axis shader program
     shaderProgram[0] = buildProgram(2, shaders);
 
     // create the shaders for the mesh

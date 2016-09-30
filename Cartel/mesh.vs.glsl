@@ -5,8 +5,6 @@ layout (location = 1) in vec3 Normal;
 layout (location = 2) in int  Selected;
 layout (location = 3) in vec3 Color;
 
-uniform bool colorized;         // if colored using color attribute
-
 out Data {
 	vec3 color;
     float selected;
@@ -37,7 +35,7 @@ uniform mat4 MVP;               // ModelViewProjection Matrix
 
 void main()
 {
-    if (colorized) {
+    if (Color[0] >= 0) {
         outData.color = Color;
     } else {
         // determine vertex color

@@ -153,7 +153,7 @@ void WorldState::loadTextures()
 
 void WorldState::resetProjection(float aspectRatio)
 {
-    projection = glm::perspective(50.0f, aspectRatio, 0.1f, 40.0f);
+    projection = glm::perspective(glm::radians(50.0f), aspectRatio, 0.1f, 40.0f);
 }
 
 void WorldState::resetView()

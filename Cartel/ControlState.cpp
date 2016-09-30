@@ -73,7 +73,7 @@ void ControlState::clearViewDeltas()
 {
     viewTheta = 0;
     viewPhi   = 0;
-    viewDepth = 0;
+    viewDepth = 0.2f;
     viewPan   = glm::vec3(0, 0, 0);
 }
 
@@ -181,6 +181,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	case GLFW_KEY_A:
 		if (action == GLFW_RELEASE) c_state.view_axis = !c_state.view_axis;
 		break;
+	case GLFW_KEY_R:
+		if (action == GLFW_RELEASE) c_state.clearViewDeltas();
+		break;
 
 	case GLFW_KEY_C:
 		if (action == GLFW_RELEASE) c_state.op = EDIT_CLEAR_SELECTION;
@@ -264,13 +267,13 @@ static void mousePos_callback(GLFWwindow* win, double x, double y)
     
         if (c_state.modShft) // update screen pan
         {
-            float perc = 50 / c_state.viewDepth;
+            float perc = 100 / c_state.viewDepth;
             c_state.viewPan = c_state.viewPan + glm::vec3(dx / perc, dy / perc, 0);
         }
         else // Update viewing angles.
         {
-            c_state.viewTheta = fmod(c_state.viewTheta + 360.0f + dx / 2.0f, 360.0f);
-            c_state.viewPhi   = std::min(90.0f, std::max(-90.0f, c_state.viewPhi - dy));
+            c_state.viewTheta = std::fmod(c_state.viewTheta + glm::radians(360.0f) + dx / 100 / 2.0f, glm::radians(360.0f));
+            c_state.viewPhi   = std::min(glm::radians(90.0f), std::max(glm::radians(-90.0f), c_state.viewPhi - dy / 100));
         }
     }
 

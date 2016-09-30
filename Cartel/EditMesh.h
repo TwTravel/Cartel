@@ -117,6 +117,9 @@ public:
 
 	void example();
 
+	void simplify_vertex_removal(int number_operations);
+	void simplify_edge_collapse(int number_operations);
+
     /*================================================
      * Iterator functions
      *================================================*/
@@ -193,6 +196,7 @@ public:
     void get_draw_data( float *verts, int *indices ) const;
     void get_draw_normals( float *normals ) const;
     void get_draw_selection( int *selection ) const;
+	void get_draw_colors( float *colors) const;
     int  get_edit_count() const;
     void get_face_neighbors(int face_index, size_t neighbors[3]);
 	void flag_edited();

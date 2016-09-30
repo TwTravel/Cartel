@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #define _SCL_SECURE_NO_WARNINGS
-#define _USE_MATH_DEFINES
 
 #include "EditMesh.h"
 
@@ -1077,39 +1076,19 @@ Eigen::Vector3d EditMesh::getFaceMidpoint(size_t tri_index) {
 
 void EditMesh::get_draw_data( float *verts, int *indices ) const {
 
-    /* get each vertex only once. This is good for efficiency
-     * but results in bad looking meshes due to each vertex 
-     * having a fixed normal
-
-        for( std::size_t i = 0, iEnd = m_faceData.size(); i < iEnd; i++ ){
-            const half_edge* he = &m_heData[ m_faceData[i] ];
-
-            for( int j = 0; j < 3; j++){
-                indices[3*i +j] = he->vert;
-                he = &this->next(*he);
-            }
-        }
-
-        for( std::size_t i = 0, iEnd = m_vertData.size(); i < iEnd; i++ ){
-		    Eigen::Vector3d vert = this->get_vertex( i );
-            for( int j = 0; j < 3; j++)
-                verts[3*i+j] = (float) vert[j];
-        }
-    */
-
     // for each face
-    for( std::size_t i = 0, iEnd = m_faceData.size(); i < iEnd; i++ ){
-        const half_edge* he = &m_heData[ m_faceData[i] ];
+    for( std::size_t f = 0, iEnd = m_faceData.size(); f < iEnd; ++f ){
+        const half_edge* he = &m_heData[ m_faceData[f] ];
 
         // for each vertex of the face
-        for( int j = 0; j < 3; j++){
+        for( int v = 0; v < 3; ++v){
             Eigen::Vector3d vert = get_vertex(he->vert);
-            indices[3*i+j] = 3*i+j;
+            indices[3*f+v] = 3*f+v;
 
             // for each component of the vertex
-            for( int k = 0; k < 3; k++){
+            for( int k = 0; k < 3; ++k){
 				// this is where we convert from the double-precision of the data structure to float for the graphics card
-                verts[3*(3*i+j) + k] = static_cast<float>(vert[k]);
+                verts[3*(3*f+v) + k] = static_cast<float>(vert[k]);
             }
             he = &this->next(*he);
         }
@@ -1118,30 +1097,18 @@ void EditMesh::get_draw_data( float *verts, int *indices ) const {
 
 void EditMesh::get_draw_normals( float *normals ) const {
 
-    /* this finds the averaged vertex normals which results in
-     * poor looking meshes when they are not smooth
-
-        for( std::size_t i = 0, iEnd = m_vertData.size(); i < iEnd; i++ ){
-		    Eigen::Vector3d normal = this->get_normal( i );
-            for( int j = 0; j < 3; j++)
-                normals[3*i+j] = (float) normal[j];
-        }
-    */
-
+	// for each face
     for( std::size_t f = 0, iEnd = m_faceData.size(); f < iEnd; ++f ){
 		Eigen::Vector3d fnormal = this->get_fnormal( f );
-		//half_edge he = m_heData[ m_faceData[f] ];
 
-		 // for each vertex of the face
-        for( int j = 0; j < 3; j++){
-			//Eigen::Vector3d vnormal = this->get_vertex(he.vert);
+		// for each vertex of the face
+        for( int v = 0; v < 3; ++v){
 
-			 // for each component of the vertex
-            for( int k = 0; k < 3; k++){
+			// for each component of the vertex
+            for( int k = 0; k < 3; ++k){
 				// this is where we convert from the double-precision of the data structure to float for the graphics card
-                normals[3*(3*f+j) + k] = static_cast<float>(fnormal[k]);
+                normals[3*(3*f+v) + k] = static_cast<float>(fnormal[k]);
             }
-			//he = next(he);
         }
     }
 }
@@ -1153,6 +1120,36 @@ void EditMesh::get_draw_selection( int *selection ) const {
 
         for( int j = 0; j < 3; j++){
             selection[3*i+j] = m_selected[verts[j]];
+        }
+    }
+}
+
+void EditMesh::get_draw_colors (float* colors) const {
+	// for each face
+    for( std::size_t f = 0, iEnd = m_faceData.size(); f < iEnd; ++f ){
+		size_t he_idx = m_faceData[f];
+
+        // for each vertex of the face
+        for( int v = 0; v < 3; ++v){
+
+			float color[3] = {-1.0f, -1.0f, -1.0f}; // negative colors will be discarded by the shader and normal lighting will be applied
+			//if (f % 20 == 0) { // example: paint every 20th face
+			//	color[0] = 0.0f;
+			//	color[1] = 1.0f;
+			//	color[2] = 1.0f;
+			//}
+
+			//if (m_heData[he_idx].vert % 20 == 0) { // example: paint every 20th vertex
+			//	color[0] = 1.0f;
+			//	color[1] = 0.0f;
+			//	color[2] = 1.0f;
+			//}
+
+            // for each component of the vertex
+            for( int k = 0; k < 3; ++k){
+                colors[3*(3*f+v) + k] = color[k];
+            }
+			he_idx = m_heData[he_idx].next;
         }
     }
 }
@@ -1529,4 +1526,12 @@ void EditMesh::example() {
 		const half_edge* he2 = &next(*he1);
 		const half_edge* he3 = &next(*he2);
 	}
+}
+
+void EditMesh::simplify_vertex_removal(int number_operations) {
+
+}
+
+void EditMesh::simplify_edge_collapse(int number_operations) {
+
 }

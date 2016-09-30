@@ -49,6 +49,9 @@ enum EDIT_OPERATION
 	EDIT_SAVE_IMAGE,
 	EDIT_CLEAR_SELECTION,
     EDIT_SQRT3_SUBDIV,
+	EDIT_BUTTERLY_SUBDIV,
+	EDIT_SIMPLIFIY_VERTEX_REMOVAL,
+	EDIT_SIMPLIFY_EDGE_COLLAPSE,
     EDIT_RELOCATE_VERTS,
 	EDIT_COLLAPSE_EDIT,
     EDIT_AREA_RELOCATION,
@@ -114,7 +117,7 @@ public:
     ControlState()
         : viewTheta(0),
           viewPhi(0),
-          viewDepth(0.2f),
+          viewDepth(0),
           arrL(0), arrR(0),
           arrU(0), arrD(0),
           mouseX(0), mouseY(0),
@@ -125,7 +128,9 @@ public:
           view_mode(VIEW_FACES | VIEW_EDGES),
           op(EDIT_NONE),
 		  view_axis(true)
-    {}
+    {
+		clearViewDeltas();
+	}
 
     ~ControlState();
     int init(WorldState &w);

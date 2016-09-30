@@ -34,28 +34,17 @@ uniform MaterialInfo Material;
 
 void main()
 {
-    float threshold = 0.005;
-
-    float tmp;
-    vec3  dst = inData.dist;
-    if (dst[2] < dst[1]) {
-        dst[1] = inData.dist[2];
-        dst[2] = inData.dist[1];
-    }
-    if (dst[1] < dst[0]) {
-        tmp = dst[0];
-        dst[0] = dst[1];
-        dst[1] = tmp;
-    }
 
     // calculate edges
-    float edgeIntensity = smoothstep(0, 1, dst[0]);
+    float dst = min(min(inData.dist[0], inData.dist[1]), inData.dist[2]);
+    float edgeIntensity = smoothstep(0, 1, dst);
 
     // calculate verts
     vec3 dist_v = inData.dist_v;
     int small = (dist_v[0] < dist_v[1]) ? 0 : 1;
     small = (dist_v[small] < dist_v[2]) ? small : 2;
 
+    float threshold = 0.005; // change to make vertices appear bigger or smaller
     float vertIntensity = smoothstep(0, threshold, dist_v[small]);
 
     vec4 out_color = vec4(0, 0, 0, 0);
