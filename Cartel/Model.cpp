@@ -121,6 +121,7 @@ void Model::updateDrawMesh()
     delete [] v_data;
     delete [] i_data;
     delete [] s_data;
+    delete [] c_data;
 
     last_drawn = m_em->get_edit_count();
 }
